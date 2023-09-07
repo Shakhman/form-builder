@@ -72,6 +72,8 @@ import Vue from 'vue';
 import { VTextField, VSelect } from 'vuetify/lib/components';
 import { SingleFormBuilder, MultiFormBuilder } from './components/FormBuilder';
 
+console.log('new features');
+
 export default Vue.extend({
   name: 'App',
 
