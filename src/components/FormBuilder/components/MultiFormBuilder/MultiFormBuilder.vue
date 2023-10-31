@@ -45,7 +45,9 @@ import _ from 'lodash';
 import SingleFormBuilder from '../SingleFormBuilder/SingleFormBuilder.vue';
 import SharedCommonPropsMixin from '../../shared/mixins/sharedCommonProps';
 
-import { MultiFormRow, AddButtonOptions, VModel } from './MultiFormBuilder.types';
+import {
+  MultiFormRow, AddButtonOptions, VModel, MultiFormElement,
+} from './MultiFormBuilder.types';
 
 const defaultAddButtonOptions = {
   divider: true,
@@ -79,6 +81,12 @@ export default class MultiFormBuilder extends Mixins(SharedCommonPropsMixin) {
 
   public selectedModel: VModel = [];
 
+  public dynamicProps: any = {};
+
+  private prevValue: VModel = []
+
+  private cachedConditionalProps: any = {};
+
   public get multiFormModel() {
     return this.value;
   }
@@ -102,30 +110,6 @@ export default class MultiFormBuilder extends Mixins(SharedCommonPropsMixin) {
       order: x === 'start' ? 1 : 3,
       class: [`text-${y}`],
     };
-  }
-
-  public get multiRows() {
-    return this.multiFormModel.map((a, index) => this.rows.map((row) => ({
-      ...row,
-      elements: (row.elements).map((el) => {
-        const copiedEl = _.cloneDeep(el);
-
-        if (el.props && 'items' in el.props && el.uniqueItems) {
-          copiedEl.props.items = (el.props.items as any[]).map((item) => {
-            const copiedMultiFormModel = [...this.multiFormModel];
-            copiedMultiFormModel.splice(index, 1);
-            const selectedElementValues = copiedMultiFormModel.flatMap((m) => m[el.name]);
-
-            return {
-              ...item,
-              disabled: selectedElementValues.includes(item.value),
-            };
-          });
-        }
-
-        return copiedEl;
-      }),
-    })));
   }
 
   private initMultiFormModel() {
@@ -159,10 +143,95 @@ export default class MultiFormBuilder extends Mixins(SharedCommonPropsMixin) {
     this.$emit('update:is-multi-form-valid', value);
   }
 
+  private getConditionalElementProps(element: MultiFormElement, index: number) {
+    const args = {
+      rowIndex: index,
+      prevRowProps: this.prevValue.length ? this.prevValue[index] : null,
+      currentRowProps: this.multiFormModel[index],
+      element,
+    };
+
+    const conditionalElementProps = element.conditionalElementProps(args) || null;
+
+    if (!conditionalElementProps) {
+      return null;
+    }
+
+    if ('value' in conditionalElementProps) {
+      this.multiFormModel[index][element.name] = conditionalElementProps.value;
+    }
+
+    const updatedProps = {
+      ...element.props,
+      ...conditionalElementProps,
+    };
+
+    return updatedProps;
+  }
+
+  private get multiRows() {
+    const multiRows = this.multiFormModel.map((a, index) => this.rows.map((row) => ({
+      ...row,
+      elements: (row.elements).map((el) => {
+        const copiedEl = _.cloneDeep(el);
+
+        const isPrevAndCurrentModelEqual = _.isEqual(
+          this.prevValue[index],
+          this.multiFormModel[index],
+        );
+
+        // console.log(index, this.prevValue[index],
+        //   this.multiFormModel[index], isPrevAndCurrentModelEqual);
+
+        if (copiedEl?.conditionalElementProps && !isPrevAndCurrentModelEqual) {
+          const updatedProps = this.getConditionalElementProps(copiedEl, index);
+
+          if (updatedProps) {
+            this.cachedConditionalProps[index][copiedEl.name] = updatedProps;
+          }
+        }
+
+        if (!this.cachedConditionalProps[index]) {
+          this.cachedConditionalProps[index] = {};
+
+          if (!this.cachedConditionalProps[index][copiedEl.name]) {
+            this.cachedConditionalProps[index][copiedEl.name] = {};
+          }
+        }
+
+        copiedEl.props = {
+          ...copiedEl.props,
+          ...this.cachedConditionalProps[index][copiedEl.name],
+        };
+
+        if (copiedEl.props && 'items' in copiedEl.props && copiedEl.uniqueItems) {
+          copiedEl.props.items = (copiedEl.props.items as any[]).map((item) => {
+            const copiedMultiFormModel = [...this.multiFormModel];
+            copiedMultiFormModel.splice(index, 1);
+            const selectedElementValues = copiedMultiFormModel.flatMap((m) => m[el.name]);
+
+            return {
+              ...item,
+              disabled: selectedElementValues.includes(item.value),
+            };
+          });
+        }
+
+        return copiedEl;
+      }),
+    })));
+
+    this.prevValue = structuredClone(this.value);
+
+    return multiRows;
+  }
+
   created() {
     if (!this.value.length) {
       this.multiFormModel.push(this.initMultiFormModel());
     }
+
+    this.prevValue = structuredClone(this.value);
   }
 }
 </script>

@@ -38,17 +38,21 @@
     </v-app-bar>
 
     <v-main>
+
       {{ model }}
       {{ isValid }}
 
       {{selectedModel}}
 
-      <SingleFormBuilder v-model="model"
-        :rows="mRows"
-        :is-valid.sync="isValid"
-        :selected-rows.sync="selectedRows"
-        @selected-model="selectedModel = $event"
-      />
+      <BaseButton @click="showModal = true"/>
+
+        <MultiFormBuilder
+        :addButtonOptions="addButtonOptions"
+        :rows="mRows2"
+        :is-multi-form-valid.sync="isValidM"
+        @selected-model="selectedModelM = $event"
+        v-model="multiModel"
+      ></MultiFormBuilder>
 
       <h4>MultiForm</h4>
 
@@ -56,21 +60,30 @@
       {{isValidM}}
       {{selectedModelM}}
 
-      <MultiFormBuilder
-        :addButtonOptions="addButtonOptions"
-        :rows="mRows2"
-        :is-multi-form-valid.sync="isValidM"
-        @selected-model="selectedModelM = $event"
-        v-model="multiModel"
-      ></MultiFormBuilder>
     </v-main>
+
+    <BaseDialog :value="showModal">
+    <template #content>
+{{model}}
+            <SingleFormBuilder v-model="model"
+        :rows="mRows"
+        :is-valid.sync="isValid"
+        :selected-rows.sync="selectedRows"
+        @selected-model="selectedModel = $event"
+      />
+    </template>
+    </BaseDialog>
   </v-app>
 </template>
 
 <script lang="ts">
 import Vue from 'vue';
 import { VTextField, VSelect } from 'vuetify/lib/components';
+import BaseButton from './components/Base/BaseButton.vue';
+import BaseDialog from './components/Base/BaseDialog.vue';
 import { SingleFormBuilder, MultiFormBuilder } from './components/FormBuilder';
+import { MultiFormRow } from './components/FormBuilder/components/MultiFormBuilder/MultiFormBuilder.types';
+import MonthlyDateRangeSelector from './components/MonthlyDateRangeSelector.vue';
 
 console.log('new features');
 
@@ -80,13 +93,20 @@ export default Vue.extend({
   components: {
     SingleFormBuilder,
     MultiFormBuilder,
+    BaseButton,
+    BaseDialog,
+    MonthlyDateRangeSelector,
   },
 
   data: () => ({
+    showModal: false,
     model: {
-      name: 'Test',
     },
-    multiModel: [{ name: 'name2', select: 3, select2: [1, 2] }, { name: 'name22', select: 1, select2: [3] }],
+    multiModel: [{
+      name: 'name2', select: 3, select2: [1, 2],
+    }, {
+      name: 'name22', select: 1, select2: [3],
+    }],
     isValid: false,
     selectedRows: [],
     isValidM: false,
@@ -97,28 +117,32 @@ export default Vue.extend({
     mRows() {
       return [
         {
-          selectable: true,
           elements: [
             {
               name: 'name', component: VTextField, cols: 6, props: { label: 'Name', rules: [(v: string) => v?.length > 3] },
             },
             {
-              name: 'email', component: VTextField, cols: 5, props: { label: 'Email', disabled: this.model.name === 'Test' }, tooltip: { content: '12' },
+              // name: 'email', component: VTextField, cols: 6, props: { label: 'Email', disabled: this.model.name === 'Test' },
+              name: 'range', component: MonthlyDateRangeSelector, cols: 6, props: { startMonth: 1, endMonth: 2 },
             },
           ],
         },
         {
-          selectable: true,
+          selectable: false,
           elements: [
             {
-              name: 'name3', component: VTextField, cols: 5, props: { label: 'Name2' },
+              name: 'name3', component: VTextField, cols: 6, props: { label: 'Name2' },
+            },
+            {
+              name: 'name4', component: VTextField, cols: 6, props: { label: 'Name4' },
             },
 
           ],
         },
       ];
     },
-    mRows2() {
+    mRows2(): MultiFormRow[] {
+      console.log('mRows2');
       return [
         {
           elements: [
@@ -126,7 +150,31 @@ export default Vue.extend({
               name: 'name', component: VTextField, cols: 6, props: { label: 'Name2', rules: [(v: string) => v?.length > 4] },
             },
             {
-              name: 'email2', component: VTextField, cols: 5, props: { label: 'Email2' },
+              name: 'email2',
+              component: VTextField,
+              cols: 6,
+              props: { label: 'Email2' },
+              conditionalElementProps: ({
+                rowIndex, currentRowProps, prevRowProps, element,
+              }) => {
+                if (prevRowProps && prevRowProps.select !== currentRowProps.select) {
+                  if (currentRowProps.select === 2) {
+                    return {
+                      disabled: true,
+                      label: 'disabled',
+                      value: '',
+                    };
+                  }
+
+                  return element.props;
+                }
+
+                return element.props;
+
+                // return {
+                //   items: rowProps.name === '2' ? [...element.props.items, { value: 4, text: '4' }] : element.props.items,
+                // };
+              },
             },
           ],
         },

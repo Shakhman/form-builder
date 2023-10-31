@@ -12,8 +12,8 @@
             />
             <component
               :is="element.component"
-              v-bind="element.props"
               v-model="model[element.name]"
+              v-bind="element.props"
               :class="element.class"
               class="mt-0"
               :style="element.style"
@@ -133,11 +133,14 @@ export default class FormBuilder extends Mixins(SharedCommonPropsMixin) {
 
   .row {
     gap: var(--gap);
+    flex-wrap: nowrap;
+    align-items: flex-start;
   }
 
   .col {
     display: flex;
     align-items: center;
+    flex: inherit !important;
   }
 }
 </style>
